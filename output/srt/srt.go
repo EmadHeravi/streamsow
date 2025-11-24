@@ -16,10 +16,10 @@ import (
 	"time"
 
 	"code.videolan.org/rist/ristgo/libristwrapper"
-	"github.com/haivision/srtgo"
 	"github.com/odmedia/streamzeug/logging"
 	"github.com/odmedia/streamzeug/mainloop"
 	"github.com/odmedia/streamzeug/output"
+	srtwrap "github.com/odmedia/streamzeug/srt"
 	"github.com/odmedia/streamzeug/stats"
 	"github.com/rs/zerolog"
 )
@@ -30,15 +30,15 @@ var (
 
 func init() {
 	logger = logging.Log.With().Str("module", "srt-input").Logger()
-	srtgo.InitSRT()
-	srtgo.SrtSetLogLevel(srtgo.SrtLogLevelNotice)
-	srtgo.SrtSetLogHandler(srtLogCB)
+	srtwrap.Init()
+	srtwrap.SetLogLevel(srtwrap.LogLevelNotice)
+	srtwrap.SetLogHandler(srtLogCB)
 }
 
 type srtoutput struct {
 	ctx               context.Context
 	cancel            context.CancelFunc
-	srt               *srtgo.SrtSocket
+	srt               *srtwrap.Socket
 	host              string
 	timeout           int
 	identifier        string
@@ -55,14 +55,11 @@ type srtoutput struct {
 }
 
 func (s *srtoutput) String() string {
-	if s.srt.Mode() == srtgo.ModeCaller {
-		return "srt: " + s.SanitisedURL.String()
-	}
-	return "srt: " + s.host + "@" + s.SanitisedURL.String()
+	return s.SanitisedURL.String()
 }
 
 func (s *srtoutput) Count() int {
-	if s.srt.Mode() == srtgo.ModeCaller {
+	if s.srt.Mode() == srtwrap.ModeCaller {
 		return 1
 	}
 	return len(s.clients)
@@ -71,14 +68,24 @@ func (s *srtoutput) Count() int {
 func (s *srtoutput) Write(block *libristwrapper.RistDataBlock) (n int, e error) {
 	n, e = s.srt.Write(block.Data)
 	if e != nil {
-		if s.srt.Mode() == srtgo.ModeFailure {
-			logger.Info().Str("identifier", s.identifier).Str("output_identifier", s.output_identifier).Str("srt-url", s.SanitisedURL.String()).Str("client", s.host).Msgf("SRT client %s disconnected", s.host)
+		if s.srt.Mode() == srtwrap.ModeFailure {
+			logger.Info().
+				Str("identifier", s.identifier).
+				Str("output_identifier", s.output_identifier).
+				Str("srt-url", s.SanitisedURL.String()).
+				Str("client", s.host).
+				Msgf("SRT client %s disconnected", s.host)
 			s.parent.clientsLock.Lock()
 			delete(s.parent.clients, s.index)
 			s.parent.clientsLock.Unlock()
-		} else if s.srt.Mode() == srtgo.ModeCaller {
-			logger.Info().Str("identifier", s.identifier).Str("output_identifier", s.output_identifier).Str("srt-url", s.SanitisedURL.String()).Str("client", s.host).Msgf("Lost connection to SRT server: %s", s.host)
-			s.srt.Close()
+		} else if s.srt.Mode() == srtwrap.ModeCaller {
+			logger.Error().
+				Str("identifier", s.identifier).
+				Str("output_identifier", s.output_identifier).
+				Str("srt-url", s.SanitisedURL.String()).
+				Str("client", s.host).
+				Err(e).
+				Msgf("Error sending data to SRT client %s", s.host)
 			go s.reconnect()
 		}
 	}
@@ -100,7 +107,12 @@ func (s *srtoutput) listenAccept() {
 	for {
 		srtSocket, u, err := s.srt.Accept()
 		if err != nil {
-			logger.Error().Str("identifier", s.identifier).Str("output_identifier", s.output_identifier).Str("srt-url", s.SanitisedURL.String()).Err(err).Msg("error in srtsocket listen")
+			logger.Error().
+				Str("identifier", s.identifier).
+				Str("output_identifier", s.output_identifier).
+				Str("srt-url", s.SanitisedURL.String()).
+				Err(err).
+				Msg("error in srtsocket listen")
 			break
 		}
 		srtoutput := *s
@@ -127,15 +139,20 @@ func (s *srtoutput) listenAccept() {
 func (s *srtoutput) statsLoop() {
 	for {
 		time.Sleep(time.Duration(stats.StatsIntervalSeconds) * time.Second)
-		stats, err := s.srt.Stats()
+		statsVal, err := s.srt.Stats()
 		if err != nil {
-			if errors.Is(err, srtgo.SRTErrno(srtgo.ENoConn)) || errors.Is(err, srtgo.SRTErrno(srtgo.EInvSock)) {
+			if errors.Is(err, srtwrap.SRTErrno(srtwrap.ErrNoConn)) || errors.Is(err, srtwrap.SRTErrno(srtwrap.ErrInvSock)) {
 				break
 			}
-			logger.Error().Str("identifier", s.identifier).Str("output_identifier", s.output_identifier).Str("srt-url", s.SanitisedURL.String()).Err(err).Msg("error in srt statsloop")
+			logger.Error().
+				Str("identifier", s.identifier).
+				Str("output_identifier", s.output_identifier).
+				Str("srt-url", s.SanitisedURL.String()).
+				Err(err).
+				Msg("error in srt statsloop")
 			break
 		}
-		go s.stats.HandleStats(s.host, s.output_identifier, s.Url, stats)
+		go s.stats.HandleStats(s.host, s.output_identifier, s.Url, statsVal)
 	}
 }
 
@@ -167,16 +184,20 @@ func setupSrtSocket(s *srtoutput) error {
 	}
 	delete(options, "identifier")
 	options["blocking"] = "0"
-	options["transtype"] = "live"
-	if host == "0.0.0.0" {
-		options["mode"] = "listener"
+	options["latency"] = strconv.Itoa(s.timeout)
+	// write timeout in ms
+	options["sndtimeo"] = strconv.Itoa(s.timeout * 1000)
+	options["rcvtimeo"] = strconv.Itoa(s.timeout * 1000)
+
+	srtSocket, err := srtwrap.NewSocket(host, uint16(port), options)
+	if err != nil {
+		return err
 	}
-	srtSocket := srtgo.NewSrtSocket(host, uint16(port), options)
 	if srtSocket == nil {
 		return errors.New("got nil srtSocket")
 	}
 	s.srt = srtSocket
-	if srtSocket.Mode() == srtgo.ModeListener {
+	if srtSocket.Mode() == srtwrap.ModeListener {
 		if err := srtSocket.Listen(5); err != nil {
 			return err
 		}
@@ -184,21 +205,25 @@ func setupSrtSocket(s *srtoutput) error {
 		go s.listenAccept()
 	} else {
 		if err := srtSocket.Connect(); err != nil {
-			if _, ok := err.(*srtgo.SrtSocketClosed); ok {
+			if _, ok := err.(*srtwrap.SocketClosed); ok {
 				srtSocket.Close()
 				go s.reconnect()
 				return nil
 			}
 			return err
 		}
-		logger.Info().Str("output_identifier", s.identifier).Str("srt-url", s.Url.String()).Str("client", s.host).Msgf("SRT Connected to: %s", s.host)
+		logger.Info().
+			Str("output_identifier", s.identifier).
+			Str("srt-url", s.Url.String()).
+			Str("client", s.host).
+			Msgf("SRT Connected to: %s", s.host)
 		go s.statsLoop()
 		s.m.AddOutput(s)
 	}
 	return nil
 }
 
-func ParseSrtOutput(ctx context.Context, u *url.URL, identifier, output_identifier string, m *mainloop.Mainloop, stats *stats.Stats, wait *sync.WaitGroup) (output.Output, error) {
+func ParseSrtOutput(ctx context.Context, u *url.URL, identifier string, output_identifier string, m *mainloop.Mainloop, stats *stats.Stats, wait *sync.WaitGroup) (output.Output, error) {
 	context, cancel := context.WithCancel(ctx)
 	var srtout srtoutput
 	srtout.Url = u
@@ -210,42 +235,55 @@ func ParseSrtOutput(ctx context.Context, u *url.URL, identifier, output_identifi
 		sanitised.RawQuery = q.Encode()
 		srtout.SanitisedURL = sanitised
 	}
-	logging.Log.Info().Str("identifier", identifier).Msgf("setting up srt output: %s", srtout.SanitisedURL)
+	logging.Log.Info().
+		Str("identifier", identifier).
+		Msgf("setting up srt output: %s", srtout.SanitisedURL)
 	srtout.identifier = identifier
 	srtout.output_identifier = output_identifier
 	srtout.ctx = context
 	srtout.cancel = cancel
-	srtout.timeout = 0
 	srtout.m = m
-	srtout.stats = stats
+	wait.Add(1)
 	srtout.wg = wait
+
+	srtout.timeout, _ = strconv.Atoi(u.Query().Get("timeout"))
+	if srtout.timeout == 0 {
+		logger.Warn().
+			Str("identifier", identifier).
+			Str("output_identifier", output_identifier).
+			Str("srt-url", srtout.SanitisedURL.String()).
+			Msg("timeout set to 0, this will cause problems, set it to something sane")
+	}
+	srtout.stats = stats
+
 	err := setupSrtSocket(&srtout)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	return &srtout, nil
 }
 
-func srtLogCB(level srtgo.SrtLogLevel, file string, line int, area, message string) {
-	//this strips the start of the SRT log message, which we don't need
+func srtLogCB(level srtwrap.LogLevel, file string, line int, area, message string) {
+	// this strips the start of the SRT log message, which we don't need
 	index := strings.Index(message, "c:")
 	if index > 0 {
 		index += 3
 		message = message[index:]
 	}
-	message = strings.TrimSuffix(message, "\n")
+	message = strings.TrimSpace(message)
 	switch level {
-	case srtgo.SrtLogLevelCrit:
+	case srtwrap.LogLevelCrit:
 		logger.Panic().Str("file", file).Int("line", line).Str("area", area).Msg(message)
-	case srtgo.SrtLogLevelErr:
+	case srtwrap.LogLevelErr:
 		logger.Error().Str("file", file).Int("line", line).Str("area", area).Msg(message)
-	case srtgo.SrtLogLevelWarning:
+	case srtwrap.LogLevelWarn:
 		logger.Warn().Str("file", file).Int("line", line).Str("area", area).Msg(message)
-	case srtgo.SrtLogLevelNotice:
+	case srtwrap.LogLevelNotice:
 		logger.Info().Str("file", file).Int("line", line).Str("area", area).Msg(message)
-	case srtgo.SrtLogLevelInfo:
+	case srtwrap.LogLevelInfo:
 		logger.Info().Str("file", file).Int("line", line).Str("area", area).Msg(message)
-	case srtgo.SrtLogLevelDebug:
+	case srtwrap.LogLevelDebug:
 		logger.Debug().Str("file", file).Int("line", line).Str("area", area).Msg(message)
 	default:
 	}
