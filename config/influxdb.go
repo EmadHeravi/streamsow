@@ -1,25 +1,33 @@
 /*
- * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V. All right reserved.
- * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
+ * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V.
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 package config
 
-type InfluxDBConfig struct {
-	Url                    string `yaml:"url"`
-	Token                  string `yaml:"token"`
-	Bucket                 string `yaml:"bocket"`
-	Org                    string `yaml:"org"`
-	SrtMeasurement         string `yaml:"srt"`
-	RistRXMeasurement      string `yaml:"ristrx"`
-	RistTXMeasurement      string `yaml:"risttx"`
-	ApplicationMeasurement string `yaml:"application"`
+import (
+	"fmt"
+	"net/url"
+)
+
+// InfluxDB configuration: only the URL is required.
+type InfluxDB struct {
+	URL string `yaml:"url"`
 }
 
-func ValidateInfluxDBConfig(c *InfluxDBConfig) error {
+// Validate checks the InfluxDB configuration for correctness.
+func (c *InfluxDB) Validate() error {
 	if c == nil {
 		return nil
 	}
-	return validateURL(c.Url)
+	if c.URL == "" {
+		return fmt.Errorf("influxdb.url is required")
+	}
+
+	_, err := url.Parse(c.URL)
+	if err != nil {
+		return fmt.Errorf("invalid influxdb.url %q: %w", c.URL, err)
+	}
+
+	return nil
 }
