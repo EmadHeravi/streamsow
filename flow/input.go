@@ -13,12 +13,17 @@ import (
 
 // Flow-level input interface
 type Input interface {
+	// Start begins the input reader loop
 	Start() error
+
+	// Close terminates the input and releases resources
 	Close()
+
+	// Identifier returns the configured identifier for this input
 	Identifier() string
 }
 
-// StartInput wraps input.Start()
+// StartInput wraps input.Start() for a single input instance.
 func StartInput(ctx context.Context, in input.Input) error {
 	if in == nil {
 		return nil
@@ -26,11 +31,11 @@ func StartInput(ctx context.Context, in input.Input) error {
 	return in.Start()
 }
 
-// setupInput chooses the correct input based on URL scheme
+// setupInput chooses and initializes the correct input based on URL scheme.
 func (f *Flow) setupInput(c *config.Input) error {
-	u, err := url.Parse(c.Url)
+	u, err := url.Parse(c.URL)
 	if err != nil {
-		return fmt.Errorf("invalid input URL: %w", err)
+		return fmt.Errorf("invalid input URL %q: %w", c.URL, err)
 	}
 
 	var in input.Input
@@ -39,19 +44,19 @@ func (f *Flow) setupInput(c *config.Input) error {
 	case "rist":
 		in, err = rist.SetupRistInput(u, c.Identifier, f.receiver)
 		if err != nil {
-			return fmt.Errorf("could not setup rist input: %w", err)
+			return fmt.Errorf("could not setup rist input %q: %w", c.URL, err)
 		}
 
 	case "udp", "rtp":
 		in, err = udp.SetupUDPInput(f.context, u, c.Identifier)
 		if err != nil {
-			return fmt.Errorf("could not setup udp input: %w", err)
+			return fmt.Errorf("could not setup udp input %q: %w", c.URL, err)
 		}
 
 	default:
-		return fmt.Errorf("unsupported input scheme: %s", u.Scheme)
+		return fmt.Errorf("unsupported input scheme %q", u.Scheme)
 	}
 
-	f.configuredInputs[c.Url] = in
+	f.configuredInputs[c.URL] = in
 	return nil
 }
