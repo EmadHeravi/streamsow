@@ -20,21 +20,21 @@ import (
 // ------------------------------------------------------------
 
 type Config struct {
-	Identifier string   `yaml:"identifier"`
-	InfluxDB   InfluxDB `yaml:"influxdb"`
-	ListenHTTP string   `yaml:"listenhttp"`
-	Flows      []Flow   `yaml:"flows"`
+	Identifier string         `yaml:"identifier"`
+	InfluxDB   InfluxDBConfig `yaml:"influxdb"`
+	ListenHTTP string         `yaml:"listenhttp"`
+	Flows      []Flow         `yaml:"flows"`
 }
 
 // ------------------------------------------------------------
-// InfluxDB config
+// InfluxDB config (correct name expected by stats/influxdb.go)
 // ------------------------------------------------------------
 
-type InfluxDB struct {
+type InfluxDBConfig struct {
 	URL string `yaml:"url"`
 }
 
-func (c *InfluxDB) Validate() error {
+func (c *InfluxDBConfig) Validate() error {
 	if c == nil {
 		return nil
 	}
@@ -122,7 +122,7 @@ func (f *Flow) ValidateFlowConfig() error {
 
 		switch u.Scheme {
 		case "rist", "udp", "rtp":
-			// OK
+			// valid
 		default:
 			return fmt.Errorf("unsupported input scheme: %s", u.Scheme)
 		}
@@ -148,7 +148,7 @@ func (f *Flow) ValidateFlowConfig() error {
 			return fmt.Errorf("invalid output URL: %s", out.URL)
 		}
 
-		// original strict behaviour: only SRT is supported
+		// Only SRT is supported
 		if u.Scheme != "srt" {
 			return fmt.Errorf("unsupported output scheme: %s", u.Scheme)
 		}
@@ -177,7 +177,7 @@ func LoadFromFile(filename string) (*Config, error) {
 		return nil, err
 	}
 
-	// validate each flow
+	// validate flows
 	for _, fl := range conf.Flows {
 		if err := fl.ValidateFlowConfig(); err != nil {
 			return nil, err
