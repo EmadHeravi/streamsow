@@ -79,6 +79,12 @@ func CreateFlow(ctx context.Context, c *config.Flow) (*Flow, error) {
 	m := mainloop.NewMainloop(flow.context, rf, c.Identifier)
 	flow.m = m
 
+	// Now that the mainloop exists, start any UDP/RTP inputs so that
+	// their reader goroutines can push packets into the UDP channel.
+	if err := flow.startUDPInputs(); err != nil {
+		return nil, fmt.Errorf("failed to start udp inputs: %w", err)
+	}
+
 	flow.configuredOutputs = make(map[string]outhandle)
 	for _, o := range c.Outputs {
 		err := flow.setupOutput(&o)

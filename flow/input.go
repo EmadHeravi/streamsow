@@ -1,13 +1,6 @@
-/*
- * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V.
- * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
-
 package flow
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 
@@ -17,22 +10,10 @@ import (
 	"github.com/odmedia/streamzeug/input/udp"
 )
 
-// FlowInput is the interface used by the Flow for all inputs.
-type FlowInput interface {
-	StartReader(ch chan<- input.Packet) error
-	Close()
-	Identifier() string
-}
-
-// StartInput starts the input reader loop for a given input.
-func StartInput(ctx context.Context, in input.Input) error {
-	if in == nil {
-		return nil
-	}
-	return in.Start()
-}
-
-// setupInput selects and initializes the correct input type (RIST or UDP/RTP).
+// setupInput chooses and initializes the correct input based on URL scheme.
+// For RIST inputs we use the existing rist.SetupRistInput helper.
+// For UDP/RTP inputs we construct a udp.UdpInput; the reader goroutine
+// is started later once the mainloop is available.
 func (f *Flow) setupInput(c *config.Input) error {
 	u, err := url.Parse(c.URL)
 	if err != nil {
@@ -45,13 +26,13 @@ func (f *Flow) setupInput(c *config.Input) error {
 	case "rist":
 		in, err = rist.SetupRistInput(u, c.Identifier, f.receiver)
 		if err != nil {
-			return fmt.Errorf("failed to setup RIST input %q: %w", c.URL, err)
+			return fmt.Errorf("could not setup rist input %q: %w", c.URL, err)
 		}
 
 	case "udp", "rtp":
-		in, err = udp.NewUdpInput(f.context, u, c.Identifier)
+		in, err = udp.SetupUDPInput(f.context, u, c.Identifier)
 		if err != nil {
-			return fmt.Errorf("failed to setup UDP/RTP input %q: %w", c.URL, err)
+			return fmt.Errorf("could not setup udp input %q: %w", c.URL, err)
 		}
 
 	default:
@@ -59,5 +40,29 @@ func (f *Flow) setupInput(c *config.Input) error {
 	}
 
 	f.configuredInputs[c.URL] = in
+	return nil
+}
+
+// startUDPInputs is called once the mainloop has been created.
+// It finds all configured UDP/RTP inputs and starts their reader
+// goroutines, wiring them into the mainloop's UDP channel.
+func (f *Flow) startUDPInputs() error {
+	if f.m == nil {
+		return nil
+	}
+
+	udpChan := f.m.UDPChannel()
+
+	for urlStr, in := range f.configuredInputs {
+		udpInput, ok := in.(*udp.UdpInput)
+		if !ok {
+			continue
+		}
+
+		if err := udpInput.StartReader(udpChan); err != nil {
+			return fmt.Errorf("failed to start udp input %s: %w", urlStr, err)
+		}
+	}
+
 	return nil
 }
