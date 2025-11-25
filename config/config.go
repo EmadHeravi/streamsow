@@ -20,18 +20,34 @@ import (
 // ------------------------------------------------------------
 
 type Config struct {
-	Identifier string `yaml:"identifier"`
-	InfluxDB   Influx `yaml:"influxdb"`
-	ListenHTTP string `yaml:"listenhttp"`
-	Flows      []Flow `yaml:"flows"`
+	Identifier string   `yaml:"identifier"`
+	InfluxDB   InfluxDB `yaml:"influxdb"`
+	ListenHTTP string   `yaml:"listenhttp"`
+	Flows      []Flow   `yaml:"flows"`
 }
 
 // ------------------------------------------------------------
 // InfluxDB config
 // ------------------------------------------------------------
 
-type Influx struct {
+type InfluxDB struct {
 	URL string `yaml:"url"`
+}
+
+func (c *InfluxDB) Validate() error {
+	if c == nil {
+		return nil
+	}
+	if c.URL == "" {
+		return fmt.Errorf("influxdb.url is required")
+	}
+
+	_, err := url.Parse(c.URL)
+	if err != nil {
+		return fmt.Errorf("invalid influxdb.url %q: %w", c.URL, err)
+	}
+
+	return nil
 }
 
 // ------------------------------------------------------------
@@ -79,30 +95,34 @@ func checkDuplicates(name string, items []string) error {
 	return nil
 }
 
-// ValidateFlowConfig – preserves original functionality
-// now extended to allow UDP inputs.
+// ------------------------------------------------------------
+// Flow configuration validation
+// ------------------------------------------------------------
+
 func (f *Flow) ValidateFlowConfig() error {
 	if f.Identifier == "" {
 		return errors.New("flow identifier missing")
 	}
 
-	// check input identifiers
+	// ----------------------------
+	// Validate Inputs
+	// ----------------------------
 	inIDs := []string{}
-	for _, i := range f.Inputs {
-		if i.Identifier == "" {
+	for _, in := range f.Inputs {
+		if in.Identifier == "" {
 			return fmt.Errorf("flow %s: input identifier missing", f.Identifier)
 		}
-		inIDs = append(inIDs, i.Identifier)
 
-		// validate URL
-		u, err := url.Parse(i.URL)
+		inIDs = append(inIDs, in.Identifier)
+
+		u, err := url.Parse(in.URL)
 		if err != nil {
-			return fmt.Errorf("invalid input URL: %s", i.URL)
+			return fmt.Errorf("invalid input URL: %s", in.URL)
 		}
 
 		switch u.Scheme {
 		case "rist", "udp", "rtp":
-			// valid
+			// OK
 		default:
 			return fmt.Errorf("unsupported input scheme: %s", u.Scheme)
 		}
@@ -112,20 +132,23 @@ func (f *Flow) ValidateFlowConfig() error {
 		return err
 	}
 
-	// check outputs
+	// ----------------------------
+	// Validate Outputs
+	// ----------------------------
 	outIDs := []string{}
-	for _, o := range f.Outputs {
-		if o.Identifier == "" {
+	for _, out := range f.Outputs {
+		if out.Identifier == "" {
 			return fmt.Errorf("flow %s: output identifier missing", f.Identifier)
 		}
-		outIDs = append(outIDs, o.Identifier)
 
-		u, err := url.Parse(o.URL)
+		outIDs = append(outIDs, out.Identifier)
+
+		u, err := url.Parse(out.URL)
 		if err != nil {
-			return fmt.Errorf("invalid output URL: %s", o.URL)
+			return fmt.Errorf("invalid output URL: %s", out.URL)
 		}
 
-		// original behavior: only SRT supported
+		// original strict behaviour: only SRT is supported
 		if u.Scheme != "srt" {
 			return fmt.Errorf("unsupported output scheme: %s", u.Scheme)
 		}
@@ -143,10 +166,23 @@ func LoadFromFile(filename string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	conf := Config{}
 
+	conf := Config{}
 	if err := yaml.Unmarshal(yamlData, &conf); err != nil {
 		return nil, err
 	}
+
+	// validate influx
+	if err := conf.InfluxDB.Validate(); err != nil {
+		return nil, err
+	}
+
+	// validate each flow
+	for _, fl := range conf.Flows {
+		if err := fl.ValidateFlowConfig(); err != nil {
+			return nil, err
+		}
+	}
+
 	return &conf, nil
 }
