@@ -1,6 +1,6 @@
 /*
  * SPDX-FileCopyrightText: Streamzeug Copyright © 2021
- * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
+ * SPDX-FileContributor: Author: Gijs Peskkens <gijs@peskens.net>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -27,24 +27,53 @@ type Config struct {
 }
 
 // ------------------------------------------------------------
-// InfluxDB config (correct name expected by stats/influxdb.go)
+// FULL InfluxDBConfig (required by stats/influxdb.go)
 // ------------------------------------------------------------
 
 type InfluxDBConfig struct {
-	URL string `yaml:"url"`
+	// InfluxDB server URL
+	Url string `yaml:"url"`
+
+	// API token
+	Token string `yaml:"token"`
+
+	// InfluxDB organization
+	Org string `yaml:"org"`
+
+	// InfluxDB bucket
+	Bucket string `yaml:"bucket"`
+
+	// Measurement overrides
+	SrtMeasurement         string `yaml:"srtmeasurement"`
+	RistRXMeasurement      string `yaml:"ristrxmeasurement"`
+	RistTXMeasurement      string `yaml:"risttxmeasurement"`
+	ApplicationMeasurement string `yaml:"applicationmeasurement"`
 }
 
 func (c *InfluxDBConfig) Validate() error {
 	if c == nil {
 		return nil
 	}
-	if c.URL == "" {
+
+	if c.Url == "" {
 		return fmt.Errorf("influxdb.url is required")
 	}
 
-	_, err := url.Parse(c.URL)
+	_, err := url.Parse(c.Url)
 	if err != nil {
-		return fmt.Errorf("invalid influxdb.url %q: %w", c.URL, err)
+		return fmt.Errorf("invalid influxdb.url %q: %w", c.Url, err)
+	}
+
+	if c.Token == "" {
+		return fmt.Errorf("influxdb.token is required")
+	}
+
+	if c.Org == "" {
+		return fmt.Errorf("influxdb.org is required")
+	}
+
+	if c.Bucket == "" {
+		return fmt.Errorf("influxdb.bucket is required")
 	}
 
 	return nil
@@ -122,7 +151,6 @@ func (f *Flow) ValidateFlowConfig() error {
 
 		switch u.Scheme {
 		case "rist", "udp", "rtp":
-			// valid
 		default:
 			return fmt.Errorf("unsupported input scheme: %s", u.Scheme)
 		}
@@ -148,7 +176,6 @@ func (f *Flow) ValidateFlowConfig() error {
 			return fmt.Errorf("invalid output URL: %s", out.URL)
 		}
 
-		// Only SRT is supported
 		if u.Scheme != "srt" {
 			return fmt.Errorf("unsupported output scheme: %s", u.Scheme)
 		}
