@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V.
+ * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 package flow
 
 import (
@@ -11,19 +17,14 @@ import (
 	"github.com/odmedia/streamzeug/input/udp"
 )
 
-// Flow-level input interface
-type Input interface {
-	// Start begins the input reader loop
-	Start() error
-
-	// Close terminates the input and releases resources
+// FlowInput is the interface used by the Flow for all inputs.
+type FlowInput interface {
+	StartReader(ch chan<- input.Packet) error
 	Close()
-
-	// Identifier returns the configured identifier for this input
 	Identifier() string
 }
 
-// StartInput wraps input.Start() for a single input instance.
+// StartInput starts the input reader loop for a given input.
 func StartInput(ctx context.Context, in input.Input) error {
 	if in == nil {
 		return nil
@@ -31,7 +32,7 @@ func StartInput(ctx context.Context, in input.Input) error {
 	return in.Start()
 }
 
-// setupInput chooses and initializes the correct input based on URL scheme.
+// setupInput selects and initializes the correct input type (RIST or UDP/RTP).
 func (f *Flow) setupInput(c *config.Input) error {
 	u, err := url.Parse(c.URL)
 	if err != nil {
@@ -44,13 +45,13 @@ func (f *Flow) setupInput(c *config.Input) error {
 	case "rist":
 		in, err = rist.SetupRistInput(u, c.Identifier, f.receiver)
 		if err != nil {
-			return fmt.Errorf("could not setup rist input %q: %w", c.URL, err)
+			return fmt.Errorf("failed to setup RIST input %q: %w", c.URL, err)
 		}
 
 	case "udp", "rtp":
-		in, err = udp.SetupUDPInput(f.context, u, c.Identifier)
+		in, err = udp.NewUdpInput(f.context, u, c.Identifier)
 		if err != nil {
-			return fmt.Errorf("could not setup udp input %q: %w", c.URL, err)
+			return fmt.Errorf("failed to setup UDP/RTP input %q: %w", c.URL, err)
 		}
 
 	default:

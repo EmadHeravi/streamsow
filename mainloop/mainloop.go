@@ -17,6 +17,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// InputPacket is a generic packet structure used for non-RIST
+// inputs such as plain UDP/RTP. It allows UDP readers to push
+// data into the mainloop without changing the existing RIST
+// receiver and output wiring.
+type InputPacket struct {
+	Data      []byte
+	Timestamp int64
+	Source    string
+}
+
 type inputstatus struct {
 	packetcount        int
 	packetcountsince   int
@@ -33,10 +43,18 @@ type Mainloop struct {
 	outPutAdd          chan output.Output
 	outPutRemove       chan output.Output
 	outRemoveIdx       chan int
+	udpChan            chan InputPacket
 	wg                 sync.WaitGroup
 	statusLock         sync.Mutex
 	primaryInputStatus inputstatus
 	lastStatusCall     time.Time
+}
+
+// UDPChannel returns the internal UDP packet channel. UDP inputs
+// should send InputPacket instances to this channel from their
+// reader goroutines.
+func (m *Mainloop) UDPChannel() chan<- InputPacket {
+	return m.udpChan
 }
 
 func (m *Mainloop) removeOutputByID(idx int) {
@@ -90,6 +108,8 @@ func (m *Mainloop) Wait(timeout time.Duration) {
 	}
 }
 
+// NewMainloop wires a RIST ReceiverFlow into the main processing loop.
+// UDP/RTP inputs can additionally push packets into udpChan.
 func NewMainloop(ctx context.Context, flow ristgo.ReceiverFlow, identifier string) *Mainloop {
 	m := &Mainloop{
 		ctx:          ctx,
@@ -99,6 +119,7 @@ func NewMainloop(ctx context.Context, flow ristgo.ReceiverFlow, identifier strin
 		outPutAdd:    make(chan output.Output, 4),
 		outPutRemove: make(chan output.Output, 4),
 		outRemoveIdx: make(chan int, 16),
+		udpChan:      make(chan InputPacket, 512),
 	}
 	go receiveLoop(m)
 	return m
@@ -119,6 +140,7 @@ main:
 		case <-m.ctx.Done():
 			break main
 
+		// RIST receiver path (existing behaviour)
 		case rb, ok := <-m.flow.DataChannel():
 			if !ok {
 				break main
@@ -148,11 +170,28 @@ main:
 			m.primaryInputStatus.bytesSince += len(rb.Data)
 			m.statusLock.Unlock()
 			m.writeOutputs(rb)
+
+		// UDP/RTP packet path (new)
+		case pkt := <-m.udpChan:
+			// Basic accounting for UDP-based inputs. At this stage we only
+			// update stats; writing UDP packets to outputs can be wired
+			// later without changing existing RIST behaviour.
+			if pkt.Data == nil {
+				break
+			}
+			m.statusLock.Lock()
+			m.primaryInputStatus.packetcount++
+			m.primaryInputStatus.packetcountsince++
+			m.primaryInputStatus.lastPacketTime = time.Now()
+			m.primaryInputStatus.bytesSince += len(pkt.Data)
+			m.statusLock.Unlock()
+
 		case output := <-m.outPutAdd:
 			m.statusLock.Lock()
 			m.addOutput(output, outputidx)
 			outputidx++
 			m.statusLock.Unlock()
+
 		case idx := <-m.outRemoveIdx:
 			m.statusLock.Lock()
 			output, ok := m.outputs[idx]
@@ -162,13 +201,14 @@ main:
 				m.logger.Error().Msgf("couldn't delete output at index: %d, notfound", idx)
 			}
 			m.statusLock.Unlock()
+
 		case output := <-m.outPutRemove:
 			found := false
 			m.statusLock.Lock()
 			for idx, o := range m.outputs {
 				if o.w == output {
+					m.deleteOutput(idx, output)
 					found = true
-					delete(m.outputs, idx)
 					break
 				}
 			}
@@ -181,6 +221,7 @@ main:
 	close(m.outPutAdd)
 	close(m.outPutRemove)
 	close(m.outRemoveIdx)
+	close(m.udpChan)
 	m.logger.Info().Msg("mainloop terminated")
 	m.wg.Done()
 }
