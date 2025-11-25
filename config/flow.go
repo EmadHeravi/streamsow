@@ -57,11 +57,13 @@ func ValidateFlowConfig(c *Flow) error {
 		return errors.New("flow must have non-empty Identifier")
 	}
 
-	if c.InputType != "RIST" {
-		return errors.New("only Type RIST supported atm")
+	// ALLOW RIST AND UDP
+	if c.InputType != "RIST" && c.InputType != "UDP" {
+		return errors.New("only Type RIST or UDP supported atm")
 	}
 
-	if c.RistProfile > libristwrapper.RistProfileMain {
+	// RIST-specific profile validation
+	if c.InputType == "RIST" && c.RistProfile > libristwrapper.RistProfileMain {
 		return errors.New("invalid RistProfile")
 	}
 

@@ -1,27 +1,25 @@
-/*
- * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V. All right reserved.
- * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
-
 package flow
 
 import (
-	"net/url"
+	"context"
 
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/input/rist"
+	"github.com/odmedia/streamzeug/input"
 )
 
-func (f *Flow) setupInput(c *config.Input) error {
-	u, err := url.Parse(c.Url)
-	if err != nil {
-		return err
+type Input interface {
+	// Start begins the input reader loop
+	Start() error
+
+	// Close terminates the input and releases resources
+	Close()
+
+	// Identifier returns the configured identifier for this input
+	Identifier() string
+}
+
+func StartInput(ctx context.Context, in input.Input) error {
+	if in == nil {
+		return nil
 	}
-	input, err := rist.SetupRistInput(u, f.config.Identifier, f.receiver)
-	if err != nil {
-		return err
-	}
-	f.configuredInputs[c.Url] = input
-	return nil
+	return in.Start()
 }
