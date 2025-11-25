@@ -1,3 +1,10 @@
+package stats
+
+import (
+	"fmt"
+	"net/url"
+)
+
 // ------------------------------------------------------------
 // InfluxDB config (FULL STRUCT REQUIRED BY stats/influxdb.go)
 // ------------------------------------------------------------
