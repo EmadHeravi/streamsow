@@ -1,6 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V. All right reserved.
- * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
+ * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V.
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -9,78 +8,80 @@ package config
 import (
 	"errors"
 	"fmt"
-	"math"
-	"os"
-
-	"code.videolan.org/rist/ristgo/libristwrapper"
+	"net/url"
 )
 
 type Flow struct {
-	Identifier      string                     `yaml:"identifier"`
-	InputType       string                     `yaml:"type"`
-	RistProfile     libristwrapper.RistProfile `yaml:"ristprofile"`
-	Latency         int                        `yaml:"latency"`
-	StreamID        int                        `yaml:"streamid"`
-	Inputs          []Input                    `yaml:"inputs"`
-	Outputs         []Output                   `yaml:"outputs"`
-	StatsStdOut     bool                       `yaml:"statsstdout"`
-	StatsFile       string                     `yaml:"statsfile"`
-	MinimalBitrate  int                        `yaml:"minimalbitrate"`
-	MaxPacketTimeMS int                        `yaml:"maxpackettime"`
+	Identifier      string   `yaml:"identifier"`
+	Type            string   `yaml:"type"` // RIST or UDP
+	RistProfile     int      `yaml:"ristprofile"`
+	Latency         int      `yaml:"latency"`
+	StreamID        int      `yaml:"streamid"`
+	MinimalBitrate  int      `yaml:"minimalbitrate"`
+	MaxPacketTimeMS int      `yaml:"maxpackettime"`
+	Inputs          []Input  `yaml:"inputs"`
+	Outputs         []Output `yaml:"outputs"`
+	StatsFile       string   `yaml:"statsfile"`
+	StatsStdOut     bool     `yaml:"statsstdout"`
+}
+
+type Input struct {
+	URL        string `yaml:"url"`
+	Identifier string `yaml:"identifier"`
+}
+
+type Output struct {
+	URL        string `yaml:"url"`
+	Identifier string `yaml:"identifier"`
 }
 
 func ValidateFlowConfig(c *Flow) error {
-	if len(c.Inputs) < 1 {
-		return errors.New("at least 1 input required")
-	}
-
-	if err := checkDuplicates(c.Inputs); err != nil {
-		return err
-	}
-
-	for _, i := range c.Inputs {
-		if err := validateInputConfig(&i); err != nil {
-			return fmt.Errorf("input validation failed: %w", err)
-		}
-	}
-	if err := checkDuplicates(c.Outputs); err != nil {
-		return err
-	}
-
-	for _, o := range c.Outputs {
-		if err := validateOutputConfig(&o); err != nil {
-			return fmt.Errorf("output validation failed: %w", err)
-		}
-	}
 
 	if c.Identifier == "" {
-		return errors.New("flow must have non-empty Identifier")
+		return errors.New("flow identifier missing")
+	}
+	if len(c.Inputs) == 0 {
+		return fmt.Errorf("flow %s must have at least one input", c.Identifier)
+	}
+	if len(c.Outputs) == 0 {
+		return fmt.Errorf("flow %s must have at least one output", c.Identifier)
 	}
 
-	// ALLOW RIST AND UDP
-	if c.InputType != "RIST" && c.InputType != "UDP" {
-		return errors.New("only Type RIST or UDP supported atm")
-	}
+	// --------------------------------------
+	// INPUT VALIDATION (RIST OR UDP/RTP)
+	// --------------------------------------
+	for _, in := range c.Inputs {
+		u, err := url.Parse(in.URL)
+		if err != nil {
+			return fmt.Errorf("invalid input URL %s: %w", in.URL, err)
+		}
 
-	// RIST-specific profile validation
-	if c.InputType == "RIST" && c.RistProfile > libristwrapper.RistProfileMain {
-		return errors.New("invalid RistProfile")
-	}
-
-	if c.StatsFile != "" {
-		if _, err := os.Stat(c.StatsFile); err != nil {
-			return fmt.Errorf("statssfile: %s error: %w", c.StatsFile, err)
+		switch u.Scheme {
+		case "rist":
+		case "udp":
+		case "rtp":
+			// accepted
+		default:
+			return fmt.Errorf("input scheme %s not supported (rist, udp, rtp allowed)", u.Scheme)
 		}
 	}
 
-	if c.InputType == "RIST" {
-		if c.StreamID > math.MaxUint16 {
-			return fmt.Errorf("StreamID: %d must be smaller than: %d", c.StreamID, math.MaxUint16)
+	// --------------------------------------
+	// OUTPUT VALIDATION
+	// --------------------------------------
+	for _, out := range c.Outputs {
+		u, err := url.Parse(out.URL)
+		if err != nil {
+			return fmt.Errorf("invalid output URL %s: %w", out.URL, err)
+		}
+
+		switch u.Scheme {
+		case "srt", "udp", "rtp", "dektecasi":
+			// accepted
+		default:
+			return fmt.Errorf("output scheme %s not supported", u.Scheme)
 		}
 	}
 
-	if c.MaxPacketTimeMS > 0 && c.MinimalBitrate == 0 || c.MinimalBitrate > 0 && c.MaxPacketTimeMS == 0 {
-		return errors.New("when using MaxpacketTime or MinimalBitrate both have to be set higher than 0")
-	}
 	return nil
 }

@@ -23,12 +23,15 @@ import (
 func CreateFlow(ctx context.Context, c *config.Flow) (*Flow, error) {
 	var flow Flow
 	var err error
+
 	flow.rcontext = ctx
 	flow.identifier = c.Identifier
 	flow.outputWait = new(sync.WaitGroup)
+
 	if err := config.ValidateFlowConfig(c); err != nil {
 		return nil, fmt.Errorf("config validation failed %w", err)
 	}
+
 	flow.config = *c
 	logging.Log.Info().Str("identifier", c.Identifier).Msg("setting up flow")
 	flow.context, flow.cancel = context.WithCancel(ctx)
@@ -39,7 +42,9 @@ func CreateFlow(ctx context.Context, c *config.Flow) (*Flow, error) {
 	}
 
 	if c.Latency == 0 {
-		logging.Log.Info().Str("identifier", c.Identifier).Msg("setting latency to default of 1000ms")
+		logging.Log.Info().
+			Str("identifier", c.Identifier).
+			Msg("setting latency to default of 1000ms")
 		c.Latency = 1000
 	}
 
@@ -47,6 +52,7 @@ func CreateFlow(ctx context.Context, c *config.Flow) (*Flow, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup rist receiver %w", err)
 	}
+
 	flow.configuredInputs = make(map[string]input.Input)
 	for _, i := range c.Inputs {
 		err = flow.setupInput(&i)
@@ -54,14 +60,17 @@ func CreateFlow(ctx context.Context, c *config.Flow) (*Flow, error) {
 			return nil, fmt.Errorf("failed to setup input %s: %w", i, err)
 		}
 	}
+
 	destinationPort := uint16(0)
 	if c.RistProfile != libristwrapper.RistProfileSimple {
 		destinationPort = uint16(c.StreamID)
 	}
+
 	err = flow.receiver.Start()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start rist receiver %w", err)
 	}
+
 	rf, err := flow.receiver.ConfigureFlow(destinationPort)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure rist flow %w", err)
@@ -77,5 +86,6 @@ func CreateFlow(ctx context.Context, c *config.Flow) (*Flow, error) {
 			return nil, fmt.Errorf("failed to setup output %s: %w", o, err)
 		}
 	}
+
 	return &flow, nil
 }
