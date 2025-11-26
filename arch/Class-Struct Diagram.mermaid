@@ -1,0 +1,30 @@
+classDiagram
+
+class FlowGraph {
+    nodes map[string]Node
+    AddNode(Node)
+    Connect(a, b)
+    Run()
+}
+
+class Node {
+    <<interface>>
+    Init()
+    Process(Vector)
+    Close()
+}
+
+class BufferNode {
+    buffer VectorBuffer
+    Process(Vector)
+}
+
+class VectorBuffer {
+    chunks []Vector
+    Push(Vector)
+    Pull() Vector
+}
+
+FlowGraph --> Node
+Node <|.. BufferNode
+BufferNode --> VectorBuffer

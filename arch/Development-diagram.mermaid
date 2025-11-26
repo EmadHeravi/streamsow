@@ -1,0 +1,20 @@
+flowchart TB
+
+subgraph Host
+    OS["Linux OS"]
+    App["streamzeug binary"]
+    Logs["systemd/journald"]
+end
+
+App --> OS
+App --> Logs
+
+subgraph Network
+    Client1["SRT Client"]
+    Client2["SRT Client"]
+    RTMP["RTMP Server"]
+end
+
+App --> Client1
+App --> Client2
+App --> RTMP

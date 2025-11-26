@@ -1,0 +1,32 @@
+sequenceDiagram
+    participant M as main.go
+    participant C as Config
+    participant L as Logger
+    participant I as Input
+    participant F as Flow
+    participant O as Output
+
+    M->>C: Load config
+    C-->>M: Config ready
+
+    M->>L: Init logging
+    L-->>M: OK
+
+    M->>I: Init input
+    I-->>M: OK
+
+    M->>O: Init output
+    O-->>M: OK
+
+    M->>F: Build flow graph
+    F-->>M: OK
+
+    loop Stream Loop
+        I->>F: Read vector
+        F->>F: Process nodes
+        F->>O: Write vector
+    end
+
+    M->>I: Close
+    M->>O: Close
+    M->>F: Shutdown

@@ -1,0 +1,39 @@
+classDiagram
+
+class Input {
+    <<interface>>
+    Read() Vector
+    Close()
+}
+
+class FileInput {
+    fd os.File
+    Read()
+}
+
+class SRTInput {
+    conn srt.Connection
+    Read()
+}
+
+class Output {
+    <<interface>>
+    Write(Vector)
+    Close()
+}
+
+class FileOutput {
+    fd os.File
+    Write()
+}
+
+class SRTOutput {
+    conn srt.Connection
+    Write()
+}
+
+Input <|.. FileInput
+Input <|.. SRTInput
+
+Output <|.. FileOutput
+Output <|.. SRTOutput

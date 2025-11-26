@@ -1,0 +1,30 @@
+flowchart TD
+
+Main["Main Process"]
+Config["Config"]
+Logger["Logger"]
+Stats["Stats"]
+
+InputC["Input Component"]
+FlowC["Flow Component"]
+OutputC["Output Component"]
+
+SRT["SRT Library"]
+Dektec["Dektec Driver"]
+VectorIO["VectorIO"]
+
+Main --> Config
+Main --> Logger
+Main --> Stats
+
+Main --> InputC
+Main --> FlowC
+Main --> OutputC
+
+InputC --> SRT
+OutputC --> SRT
+
+InputC --> Dektec
+OutputC --> Dektec
+
+FlowC --> VectorIO

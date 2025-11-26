@@ -1,0 +1,46 @@
+flowchart LR
+
+subgraph Core
+    main["main.go"]
+    config["config/"]
+    logging["logging/"]
+    stats["stats/"]
+end
+
+subgraph IO
+    input["input/"]
+    output["output/"]
+    vectorio["vectorio/"]
+end
+
+subgraph FlowEngine
+    flow_graph["flow/graph"]
+    flow_node["flow/node"]
+    flow_buffer["flow/buffer"]
+end
+
+subgraph Integrations
+    srtlib["srt/"]
+    includesrt["include_srt/"]
+    dektec["dectec/"]
+end
+
+main --> config
+main --> logging
+main --> stats
+
+main --> input
+main --> output
+main --> flow_graph
+
+input --> flow_graph
+flow_graph --> output
+
+vectorio --> flow_buffer
+
+includesrt --> srtlib
+srtlib --> input
+srtlib --> output
+
+dectec --> input
+dectec --> output

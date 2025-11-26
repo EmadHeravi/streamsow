@@ -1,0 +1,5 @@
+flowchart LR
+    A["Input Source<br/>(File/SRT/Dektec/TS)"] --> B["Demux/Parser"]
+    B --> C["VectorIO"]
+    C --> D["Flow Graph"]
+    D --> E["Output<br/>(File/SRT/TS)"]

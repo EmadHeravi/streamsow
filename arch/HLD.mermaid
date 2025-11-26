@@ -1,0 +1,33 @@
+flowchart TD
+
+    A["main.go<br/>entrypoint"] --> B["cmd/"]
+
+    A --> C["mainloop/"]
+    A --> D["config/"]
+    A --> E["logging/"]
+    A --> F["stats/"]
+
+    C --> G["input/"]
+    G --> G1["input/file"]
+    G --> G2["input/srt"]
+    G --> G3["input/network"]
+    G --> G4["input/mpegts"]
+
+    C --> H["output/"]
+    H --> H1["output/file"]
+    H --> H2["output/srt"]
+    H --> H3["output/mpegts"]
+
+    C --> I["flow/"]
+    I --> I1["flow/node"]
+    I --> I2["flow/graph"]
+    I --> I3["flow/buffer"]
+
+    C --> J["vectorio/"]
+
+    K["dectec/"] --> C
+    L["srt/"] --> G2
+    M["include_srt/"] --> L
+
+    N["version/"] --> A
+    O["example.yaml"] --> D

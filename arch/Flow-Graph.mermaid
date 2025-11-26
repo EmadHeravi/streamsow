@@ -1,0 +1,40 @@
+flowchart TD
+
+subgraph Input
+    A["SRT Input"]
+    B["File Input"]
+    C["Dektec Input"]
+end
+
+subgraph Parsing
+    D["MPEG-TS Parser"]
+    E["ES Extractor"]
+end
+
+subgraph Processing
+    F1["Buffer Node"]
+    F2["Remux Node"]
+    F3["Rate Control"]
+    F4["Filter Node"]
+end
+
+subgraph Output
+    G["SRT Output"]
+    H["File Output"]
+    I["TS Output"]
+end
+
+A --> D
+B --> D
+C --> D
+
+D --> E
+
+E --> F1
+F1 --> F2
+F2 --> F3
+F3 --> F4
+
+F4 --> G
+F4 --> H
+F4 --> I

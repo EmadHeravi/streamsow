@@ -1,0 +1,14 @@
+stateDiagram-v2
+    [*] --> Init
+    Init --> LoadConfig
+    LoadConfig --> InitLogger
+    InitLogger --> InitInput
+    InitInput --> InitFlow
+    InitFlow --> InitOutput
+
+    InitOutput --> Running
+    Running --> Error : failure
+    Running --> Shutdown : stop signal
+
+    Error --> Shutdown
+    Shutdown --> [*]
