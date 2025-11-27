@@ -22,28 +22,41 @@ type outhandle struct {
 	conf config.Output
 }
 
-func (f *Flow) setupOutput(c *config.Output) (err error) {
-	var (
-		outputurl *url.URL
-		out       output.Output
-	)
-	outputurl, err = url.Parse(c.Url)
+func (f *Flow) setupOutput(c *config.Output) error {
+	// Parse output URL
+	outputURL, err := url.Parse(c.URL)
 	if err != nil {
-		return fmt.Errorf("couldn't parse output url %s: %w", c.Url, err)
+		return fmt.Errorf("couldn't parse output URL %s: %w", c.URL, err)
 	}
-	switch outputurl.Scheme {
+
+	var out output.Output
+
+	// Select correct output handler
+	switch outputURL.Scheme {
 	case "udp", "rtp":
-		out, err = udp.ParseUdpOutput(f.context, outputurl, f.identifier, f.m)
+		out, err = udp.ParseUdpOutput(f.context, outputURL, f.identifier, f.m)
+
 	case "srt":
-		out, err = srt.ParseSrtOutput(f.context, outputurl, f.identifier, c.Identifier, f.m, f.statsConfig, f.outputWait)
+		out, err = srt.ParseSrtOutput(f.context, outputURL, f.identifier, c.Identifier, f.m, f.statsConfig, f.outputWait)
+
 	case "dektecasi":
-		out, err = dektecasi.ParseURL(f.context, outputurl, f.identifier, c.Identifier, f.m, f.statsConfig)
+		out, err = dektecasi.ParseURL(f.context, outputURL, f.identifier, c.Identifier, f.m, f.statsConfig)
+
 	default:
-		return fmt.Errorf("output url scheme: %s not implemented", outputurl.Scheme)
+		return fmt.Errorf("output URL scheme not implemented: %s", outputURL.Scheme)
 	}
+
+	// If output initialization failed
 	if err != nil {
-		return fmt.Errorf("couldn't setup %s output: %s: %w", outputurl.Scheme, outputurl, err)
+		return fmt.Errorf("couldn't setup %s output (%s): %w",
+			outputURL.Scheme, outputURL.String(), err)
 	}
-	f.configuredOutputs[c.Url] = outhandle{out: out, conf: *c}
+
+	// Store configured output
+	f.configuredOutputs[c.URL] = outhandle{
+		out:  out,
+		conf: *c,
+	}
+
 	return nil
 }
