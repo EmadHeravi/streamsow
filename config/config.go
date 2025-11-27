@@ -85,14 +85,16 @@ func (c *InfluxDBConfig) Validate() error {
 
 type Flow struct {
 	Identifier      string   `yaml:"identifier"`
-	Type            string   `yaml:"type"`
+	Type            string   `yaml:"type"` // RIST or UDP
 	RistProfile     int      `yaml:"ristprofile"`
 	Latency         int      `yaml:"latency"`
 	StreamID        int      `yaml:"streamid"`
-	Inputs          []Input  `yaml:"inputs"`
-	Outputs         []Output `yaml:"outputs"`
 	MinimalBitrate  int      `yaml:"minimalbitrate"`
 	MaxPacketTimeMS int      `yaml:"maxpackettime"`
+	Inputs          []Input  `yaml:"inputs"`
+	Outputs         []Output `yaml:"outputs"`
+	StatsFile       string   `yaml:"statsfile"`
+	StatsStdOut     bool     `yaml:"statsstdout"`
 }
 
 // ------------------------------------------------------------
