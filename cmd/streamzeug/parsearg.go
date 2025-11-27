@@ -80,7 +80,7 @@ func parseArguments() (*config.Config, error) {
 
 		conf.Identifier = influxDBIdentifier
 		if influxDBUrl != "" {
-			conf.InfluxDB = &config.InfluxDBConfig{
+			conf.InfluxDB = config.InfluxDBConfig{
 				Url:    influxDBUrl,
 				Token:  influxDBToken,
 				Bucket: influxDBBucket,
@@ -90,8 +90,8 @@ func parseArguments() (*config.Config, error) {
 
 		flowConf := config.Flow{
 			Identifier:  influxDBIdentifier,
-			InputType:   "RIST",
-			RistProfile: libristwrapper.RistProfileSimple,
+			Type:        "RIST",
+			RistProfile: int(libristwrapper.RistProfileSimple),
 			Latency:     ristRecoverySize,
 			StreamID:    0,
 			StatsStdOut: statsStdOut,
@@ -99,7 +99,7 @@ func parseArguments() (*config.Config, error) {
 		}
 
 		for _, input := range inputs {
-			flowConf.Inputs = append(flowConf.Inputs, config.Input{Url: input})
+			flowConf.Inputs = append(flowConf.Inputs, config.Input{URL: input})
 		}
 
 		for _, output := range outputs {
@@ -109,7 +109,7 @@ func parseArguments() (*config.Config, error) {
 			}
 			identifier := u.Query().Get("identifier")
 			flowConf.Outputs = append(flowConf.Outputs, config.Output{
-				Url:        output,
+				URL:        output,
 				Identifier: identifier,
 			})
 		}

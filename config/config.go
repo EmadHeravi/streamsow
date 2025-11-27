@@ -215,3 +215,23 @@ func LoadFromFile(filename string) (*Config, error) {
 
 	return &conf, nil
 }
+
+func ValidateConfig(conf *Config) error {
+	if conf == nil {
+		return errors.New("conf is nil")
+	}
+
+	// validate influxdb block (optional = URL empty → no influx)
+	if err := conf.InfluxDB.Validate(); err != nil {
+		return err
+	}
+
+	// validate each flow
+	for i := range conf.Flows {
+		if err := ValidateFlowConfig(&conf.Flows[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

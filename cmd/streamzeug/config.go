@@ -35,11 +35,12 @@ func applyConfig(ctx context.Context, c *config.Config) error {
 	)
 
 	influxctx, influxcancel = context.WithCancel(ctx)
-	if c.InfluxDB != nil {
-		if err := stats.SetupInfluxDB(influxctx, c.InfluxDB, c.Identifier); err != nil {
+	if c.InfluxDB.Url != "" {
+		if err := stats.SetupInfluxDB(influxctx, &c.InfluxDB, c.Identifier); err != nil {
 			return err
 		}
 	}
+
 	if c.ListenHTTP != "" {
 		httpsrv, err = startHttpServer(c.ListenHTTP)
 		if err != nil {
@@ -84,7 +85,7 @@ func reloadConfigfile(ctx context.Context) {
 		influxcancel()
 		var influxctx context.Context
 		influxctx, influxcancel = context.WithCancel(ctx)
-		if conf.InfluxDB != nil {
+		if conf.InfluxDB.Url != "" {
 			if err := stats.SetupInfluxDB(influxctx, conf.InfluxDB, conf.Identifier); err != nil {
 				logging.Log.Error().Err(err).Msg("failed to reconfigure influxdb")
 				return
