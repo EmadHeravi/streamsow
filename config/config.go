@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -51,28 +52,25 @@ type InfluxDBConfig struct {
 }
 
 func (c *InfluxDBConfig) Validate() error {
-	if c == nil {
+	// InfluxDB disabled when URL is empty
+	if strings.TrimSpace(c.Url) == "" {
 		return nil
 	}
 
-	if c.Url == "" {
-		return fmt.Errorf("influxdb.url is required")
-	}
-
-	_, err := url.Parse(c.Url)
-	if err != nil {
+	// If URL is set, require everything else
+	if _, err := url.Parse(c.Url); err != nil {
 		return fmt.Errorf("invalid influxdb.url %q: %w", c.Url, err)
 	}
 
-	if c.Token == "" {
+	if strings.TrimSpace(c.Token) == "" {
 		return fmt.Errorf("influxdb.token is required")
 	}
 
-	if c.Org == "" {
+	if strings.TrimSpace(c.Org) == "" {
 		return fmt.Errorf("influxdb.org is required")
 	}
 
-	if c.Bucket == "" {
+	if strings.TrimSpace(c.Bucket) == "" {
 		return fmt.Errorf("influxdb.bucket is required")
 	}
 
