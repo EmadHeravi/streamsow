@@ -1,5 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Streamzeug Copyright ©
+ * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V. All right reserved.
+ * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -11,16 +12,15 @@ import (
 	"time"
 
 	"code.videolan.org/rist/ristgo"
-	libristwrapper "code.videolan.org/rist/ristgo/libristwrapper"
-
 	"github.com/odmedia/streamzeug/logging"
 	"github.com/odmedia/streamzeug/output"
 	"github.com/rs/zerolog"
 )
 
-// -------------------------------
-// Generic UDP/RTP packet wrapper
-// -------------------------------
+// InputPacket is a generic packet structure used for non-RIST
+// inputs such as plain UDP/RTP. It allows UDP readers to push
+// data into the mainloop without changing the existing RIST
+// receiver and output wiring.
 type InputPacket struct {
 	Data      []byte
 	Timestamp int64
@@ -35,9 +35,6 @@ type inputstatus struct {
 	lastPacketTime     time.Time
 }
 
-// -------------------------------
-// Mainloop struct
-// -------------------------------
 type Mainloop struct {
 	ctx                context.Context
 	flow               ristgo.ReceiverFlow
@@ -53,16 +50,13 @@ type Mainloop struct {
 	lastStatusCall     time.Time
 }
 
-// -------------------------------
-// UDP Channel
-// -------------------------------
+// UDPChannel returns the internal UDP packet channel. UDP inputs
+// should send InputPacket instances to this channel from their
+// reader goroutines.
 func (m *Mainloop) UDPChannel() chan<- InputPacket {
 	return m.udpChan
 }
 
-// -------------------------------
-// Output manipulation
-// -------------------------------
 func (m *Mainloop) removeOutputByID(idx int) {
 	select {
 	case <-m.ctx.Done():
@@ -72,29 +66,29 @@ func (m *Mainloop) removeOutputByID(idx int) {
 	m.outRemoveIdx <- idx
 }
 
-func (m *Mainloop) RemoveOutput(output output.Output) {
+func (m *Mainloop) RemoveOutput(o output.Output) {
 	select {
 	case <-m.ctx.Done():
 		return
 	default:
 	}
-	m.outPutRemove <- output
+	m.outPutRemove <- o
 }
 
-func (m *Mainloop) deleteOutput(idx int, output output.Output) {
-	m.logger.Info().Msgf("deleting output: %s", output.String())
+func (m *Mainloop) deleteOutput(idx int, o output.Output) {
+	m.logger.Info().Msgf("deleting output: %s", o.String())
 	close(m.outputs[idx].dataChan)
 	delete(m.outputs, idx)
 }
 
-func (m *Mainloop) AddOutput(output output.Output) {
-	m.logger.Info().Msgf("adding output %s", output.String())
+func (m *Mainloop) AddOutput(o output.Output) {
+	m.logger.Info().Msgf("adding output %s", o.String())
 	select {
 	case <-m.ctx.Done():
 		return
 	default:
 	}
-	m.outPutAdd <- output
+	m.outPutAdd <- o
 }
 
 func (m *Mainloop) Wait(timeout time.Duration) {
@@ -105,13 +99,14 @@ func (m *Mainloop) Wait(timeout time.Duration) {
 	}()
 	select {
 	case <-c:
+		return
 	case <-time.After(timeout):
+		return
 	}
 }
 
-// -------------------------------
-// Create new mainloop
-// -------------------------------
+// NewMainloop wires a RIST ReceiverFlow into the main processing loop.
+// UDP/RTP inputs can additionally push packets into udpChan for stats.
 func NewMainloop(ctx context.Context, flow ristgo.ReceiverFlow, identifier string) *Mainloop {
 	m := &Mainloop{
 		ctx:          ctx,
@@ -123,75 +118,38 @@ func NewMainloop(ctx context.Context, flow ristgo.ReceiverFlow, identifier strin
 		outRemoveIdx: make(chan int, 16),
 		udpChan:      make(chan InputPacket, 512),
 	}
-
 	go receiveLoop(m)
 	return m
 }
 
-// /////////////////////////////////////////////
-// MPEG-TS continuity counter helper
-// /////////////////////////////////////////////
-func detectTsDiscontinuity(pkt []byte, lastCC *int) bool {
-	if len(pkt) < 188 {
-		return false
-	}
-	if pkt[0] != 0x47 {
-		return false
-	}
-
-	cc := int(pkt[3] & 0x0F)
-
-	if *lastCC == -1 {
-		*lastCC = cc
-		return false
-	}
-
-	expected := (*lastCC + 1) & 0x0F
-	*lastCC = cc
-
-	return cc != expected
-}
-
-// /////////////////////////////////////////////
-// Main receiver loop
-// /////////////////////////////////////////////
 func receiveLoop(m *Mainloop) {
 	outputidx := 0
 	m.primaryInputStatus.lastPacketTime = time.Now()
 	m.lastStatusCall = m.primaryInputStatus.lastPacketTime
-
 	expectedSec := uint16(0)
-	lastUdpCC := -1 // NEW: UDP TS CC tracker
-	lastDiscontinuityMsg := time.Time{}
-	discontinuitiesSinceLastMsg := 0
-
 	m.logger.Info().Msg("receiver mainloop started")
 	m.wg.Add(1)
+	lastDiscontinuityMsg := time.Time{}
+	discontinuitiesSinceLastMsg := 0
 
 main:
 	for {
 		select {
-
 		case <-m.ctx.Done():
 			break main
 
-		// --------------------------------------------------------
-		// RIST INPUT — unchanged behaviour
-		// --------------------------------------------------------
+		// RIST receiver path (existing behaviour)
 		case rb, ok := <-m.flow.DataChannel():
 			if !ok {
 				break main
 			}
-
 			discontinuity := false
-
 			if rb.Discontinuity {
 				discontinuity = true
 			}
 			if rb.SeqNo != uint32(expectedSec) {
 				discontinuity = true
 			}
-
 			if discontinuity {
 				m.primaryInputStatus.discontinuitycount++
 				discontinuitiesSinceLastMsg++
@@ -199,7 +157,9 @@ main:
 
 			if discontinuitiesSinceLastMsg > 0 &&
 				time.Since(lastDiscontinuityMsg) >= 5*time.Second {
-				m.logger.Error().Int("count", discontinuitiesSinceLastMsg).Msg("discontinuity!")
+				m.logger.Error().
+					Int("count", discontinuitiesSinceLastMsg).
+					Msg("discontinuity!")
 				lastDiscontinuityMsg = time.Now()
 				discontinuitiesSinceLastMsg = 0
 			}
@@ -209,71 +169,55 @@ main:
 			m.statusLock.Lock()
 			m.primaryInputStatus.packetcount++
 			m.primaryInputStatus.packetcountsince++
-			m.primaryInputStatus.bytesSince += len(rb.Data)
 			m.primaryInputStatus.lastPacketTime = time.Now()
+			m.primaryInputStatus.bytesSince += len(rb.Data)
 			m.statusLock.Unlock()
 
 			m.writeOutputs(rb)
 
-		// --------------------------------------------------------
-		// UDP INPUT — NEW full forwarding + TS discontinuity
-		// --------------------------------------------------------
+		// UDP/RTP packet path (stats only, no output write)
 		case pkt := <-m.udpChan:
-
 			if pkt.Data == nil {
 				break
 			}
-
-			// --- new discontinuity detection ---
-			if detectTsDiscontinuity(pkt.Data, &lastUdpCC) {
-				m.primaryInputStatus.discontinuitycount++
-				discontinuitiesSinceLastMsg++
-			}
-
 			m.statusLock.Lock()
 			m.primaryInputStatus.packetcount++
 			m.primaryInputStatus.packetcountsince++
-			m.primaryInputStatus.bytesSince += len(pkt.Data)
 			m.primaryInputStatus.lastPacketTime = time.Now()
+			m.primaryInputStatus.bytesSince += len(pkt.Data)
 			m.statusLock.Unlock()
 
-			// Wrap raw UDP packet into RistDataBlock for outputs
-			rb := libristwrapper.NewRistDataBlock(pkt.Data)
-
-			m.writeOutputs(rb)
-
-		// --------------------------------------------------------
-		// OUTPUT MANAGEMENT
-		// --------------------------------------------------------
-		case output := <-m.outPutAdd:
+		case o := <-m.outPutAdd:
 			m.statusLock.Lock()
-			m.addOutput(output, outputidx)
+			m.addOutput(o, outputidx)
 			outputidx++
 			m.statusLock.Unlock()
 
 		case idx := <-m.outRemoveIdx:
 			m.statusLock.Lock()
-			output, ok := m.outputs[idx]
+			o, ok := m.outputs[idx]
 			if ok {
-				m.deleteOutput(idx, output.w)
+				m.deleteOutput(idx, o.w)
 			} else {
-				m.logger.Error().Msgf("couldn't delete output at index %d", idx)
+				m.logger.Error().
+					Msgf("couldn't delete output at index: %d, notfound", idx)
 			}
 			m.statusLock.Unlock()
 
-		case output := <-m.outPutRemove:
+		case o := <-m.outPutRemove:
 			found := false
 			m.statusLock.Lock()
-			for idx, o := range m.outputs {
-				if o.w == output {
-					m.deleteOutput(idx, output)
+			for idx, out := range m.outputs {
+				if out.w == o {
+					m.deleteOutput(idx, o)
 					found = true
 					break
 				}
 			}
 			m.statusLock.Unlock()
 			if !found {
-				m.logger.Error().Msgf("couldn't delete output: %s", output.String())
+				m.logger.Error().
+					Msgf("couldn't delete output: %s, notfound", o.String())
 			}
 		}
 	}
@@ -282,7 +226,6 @@ main:
 	close(m.outPutRemove)
 	close(m.outRemoveIdx)
 	close(m.udpChan)
-
 	m.logger.Info().Msg("mainloop terminated")
 	m.wg.Done()
 }
