@@ -180,6 +180,13 @@ main:
 			if pkt.Data == nil {
 				break
 			}
+
+			for _, out := range m.outputs {
+				if out != nil {
+					out.write(pkt.Data)
+				}
+			}
+
 			m.statusLock.Lock()
 			m.primaryInputStatus.packetcount++
 			m.primaryInputStatus.packetcountsince++
