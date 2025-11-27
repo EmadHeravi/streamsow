@@ -59,7 +59,7 @@ func (f *Flow) Stop() {
 	}
 
 	for _, in := range f.configuredInputs {
-		in.Stop()
+		in.Close()
 	}
 }
 
