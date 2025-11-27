@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"code.videolan.org/rist/ristgo"
+	"code.videolan.org/rist/ristgo/libristwrapper"
 	"github.com/odmedia/streamzeug/logging"
 	"github.com/odmedia/streamzeug/output"
 	"github.com/rs/zerolog"
@@ -181,10 +182,10 @@ main:
 				break
 			}
 
-			for _, out := range m.outputs {
-				if out != nil {
-					out.write(pkt.Data)
-				}
+			// Construct a RistDataBlock for UDP
+			rb := &libristwrapper.RistDataBlock{
+				Data: pkt.Data,
+				// optionally set other fields if defined (like Timestamp, Source)
 			}
 
 			m.statusLock.Lock()
