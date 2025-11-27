@@ -1,6 +1,5 @@
 module github.com/EmadHeravi/streamsow
 
-
 go 1.14
 
 require (
