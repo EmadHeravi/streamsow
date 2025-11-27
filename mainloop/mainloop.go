@@ -187,6 +187,9 @@ main:
 			m.primaryInputStatus.bytesSince += len(pkt.Data)
 			m.statusLock.Unlock()
 
+			rb := NewUDPBlock(pkt.Data)
+			m.writeOutputs(rb)
+
 		case o := <-m.outPutAdd:
 			m.statusLock.Lock()
 			m.addOutput(o, outputidx)
