@@ -238,8 +238,7 @@ main:
 			m.statusLock.Unlock()
 
 			// Wrap raw UDP packet into RistDataBlock for outputs
-			rb := &libristwrapper.RistDataBlock{}
-			rb.Data = append([]byte(nil), pkt.Data...)
+			rb := libristwrapper.NewRistDataBlock(pkt.Data)
 
 			m.writeOutputs(rb)
 
