@@ -30,7 +30,7 @@ func (f *Flow) setupInput(c *config.Input) error {
 		}
 
 	case "udp", "rtp":
-		in, err = udp.SetupUDPInput(f.context, u, c.Identifier)
+		in, err = udp.NewUdpInput(f.context, u, c.Identifier) // ✔ FIXED
 		if err != nil {
 			return fmt.Errorf("could not setup udp input %q: %w", c.URL, err)
 		}
