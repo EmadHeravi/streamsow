@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/mainloop"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/mainloop"
 )
 
 func startHttpServer(listen string) (*http.Server, error) {

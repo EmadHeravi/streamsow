@@ -12,12 +12,12 @@ import (
 	"sync"
 
 	"code.videolan.org/rist/ristgo/libristwrapper"
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/input"
-	"github.com/odmedia/streamzeug/input/rist"
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/mainloop"
-	"github.com/odmedia/streamzeug/stats"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/input"
+	"github.com/EmadHeravi/streamsow/input/rist"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/mainloop"
+	"github.com/EmadHeravi/streamsow/stats"
 )
 
 // CreateFlow initializes and configures a Flow instance.

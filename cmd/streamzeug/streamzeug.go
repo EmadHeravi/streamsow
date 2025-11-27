@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/flow"
-	"github.com/odmedia/streamzeug/logging"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/flow"
+	"github.com/EmadHeravi/streamsow/logging"
 )
 
 type arrayFlags []string

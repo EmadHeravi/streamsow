@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/output"
-	"github.com/odmedia/streamzeug/output/dektecasi"
-	"github.com/odmedia/streamzeug/output/srt"
-	"github.com/odmedia/streamzeug/output/udp"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/output"
+	"github.com/EmadHeravi/streamsow/output/dektecasi"
+	"github.com/EmadHeravi/streamsow/output/srt"
+	"github.com/EmadHeravi/streamsow/output/udp"
 )
 
 type outhandle struct {

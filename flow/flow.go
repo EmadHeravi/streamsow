@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"code.videolan.org/rist/ristgo"
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/input"
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/mainloop"
-	"github.com/odmedia/streamzeug/stats"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/input"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/mainloop"
+	"github.com/EmadHeravi/streamsow/stats"
 )
 
 // Flow is the main running entity

@@ -10,8 +10,8 @@ VERSION := $(shell cat version/VERSION 2>/dev/null || echo "0.0.0")
 GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 LDFLAGS = -ldflags "\
-    -X github.com/odmedia/streamzeug/version.ProjectVersion=$(VERSION) \
-    -X github.com/odmedia/streamzeug/version.GitVersion=$(GIT_HASH)"
+    -X github.com/EmadHeravi/streamsow/version.ProjectVersion=$(VERSION) \
+    -X github.com/EmadHeravi/streamsow/version.GitVersion=$(GIT_HASH)"
 
 
 all: binaries

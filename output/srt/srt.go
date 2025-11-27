@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"code.videolan.org/rist/ristgo/libristwrapper"
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/mainloop"
-	"github.com/odmedia/streamzeug/output"
-	srtwrap "github.com/odmedia/streamzeug/srt"
-	"github.com/odmedia/streamzeug/stats"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/mainloop"
+	"github.com/EmadHeravi/streamsow/output"
+	srtwrap "github.com/EmadHeravi/streamsow/srt"
+	"github.com/EmadHeravi/streamsow/stats"
 	"github.com/rs/zerolog"
 )
 

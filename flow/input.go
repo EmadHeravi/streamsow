@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/input"
-	"github.com/odmedia/streamzeug/input/rist"
-	"github.com/odmedia/streamzeug/input/udp"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/input"
+	"github.com/EmadHeravi/streamsow/input/rist"
+	"github.com/EmadHeravi/streamsow/input/udp"
 )
 
 // setupInput chooses and initializes the correct input based on URL scheme.

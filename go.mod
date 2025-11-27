@@ -1,4 +1,5 @@
-module github.com/odmedia/streamzeug
+module github.com/EmadHeravi/streamsow
+
 
 go 1.14
 

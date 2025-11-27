@@ -10,8 +10,8 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/odmedia/streamzeug/input"
-	"github.com/odmedia/streamzeug/logging"
+	"github.com/EmadHeravi/streamsow/input"
+	"github.com/EmadHeravi/streamsow/logging"
 )
 
 // UdpInput implements input.Input and represents a UDP-based input source.

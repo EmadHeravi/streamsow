@@ -15,10 +15,10 @@ import (
 	"strings"
 
 	"code.videolan.org/rist/ristgo/libristwrapper"
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/stats"
-	"github.com/odmedia/streamzeug/version"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/stats"
+	"github.com/EmadHeravi/streamsow/version"
 )
 
 func (i *arrayFlags) String() string {

@@ -9,8 +9,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/mainloop"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/mainloop"
 )
 
 // StartReader starts the UDP socket listener and forwards packets into flow channel.

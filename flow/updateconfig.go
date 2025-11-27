@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/logging"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/logging"
 )
 
 func (f *Flow) UpdateConfig(c *config.Flow) (err error) {

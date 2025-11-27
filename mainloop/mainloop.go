@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"code.videolan.org/rist/ristgo"
-	"code.videolan.org/rist/ristgo/libristwrapper"
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/output"
+	"github.com/EmadHeravi/streamsow/include_srt/libristwrapper"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/output"
 	"github.com/rs/zerolog"
 )
 

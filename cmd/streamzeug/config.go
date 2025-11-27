@@ -11,10 +11,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/odmedia/streamzeug/config"
-	"github.com/odmedia/streamzeug/flow"
-	"github.com/odmedia/streamzeug/logging"
-	"github.com/odmedia/streamzeug/stats"
+	"github.com/EmadHeravi/streamsow/config"
+	"github.com/EmadHeravi/streamsow/flow"
+	"github.com/EmadHeravi/streamsow/logging"
+	"github.com/EmadHeravi/streamsow/stats"
 )
 
 func createFlow(ctx context.Context, f *config.Flow) error {
