@@ -86,7 +86,7 @@ func reloadConfigfile(ctx context.Context) {
 		var influxctx context.Context
 		influxctx, influxcancel = context.WithCancel(ctx)
 		if conf.InfluxDB.Url != "" {
-			if err := stats.SetupInfluxDB(influxctx, conf.InfluxDB, conf.Identifier); err != nil {
+			if err := stats.SetupInfluxDB(influxctx, &conf.InfluxDB, conf.Identifier); err != nil {
 				logging.Log.Error().Err(err).Msg("failed to reconfigure influxdb")
 				return
 			}
