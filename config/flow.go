@@ -25,16 +25,6 @@ type Flow struct {
 	StatsStdOut     bool     `yaml:"statsstdout"`
 }
 
-type Input struct {
-	URL        string `yaml:"url"`
-	Identifier string `yaml:"identifier"`
-}
-
-type Output struct {
-	URL        string `yaml:"url"`
-	Identifier string `yaml:"identifier"`
-}
-
 func ValidateFlowConfig(c *Flow) error {
 
 	if c.Identifier == "" {
