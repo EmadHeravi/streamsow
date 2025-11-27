@@ -96,20 +96,6 @@ type Flow struct {
 }
 
 // ------------------------------------------------------------
-// Input + Output structs
-// ------------------------------------------------------------
-
-type Input struct {
-	Identifier string `yaml:"identifier"`
-	URL        string `yaml:"url"`
-}
-
-type Output struct {
-	Identifier string `yaml:"identifier"`
-	URL        string `yaml:"url"`
-}
-
-// ------------------------------------------------------------
 // Validation helpers
 // ------------------------------------------------------------
 
