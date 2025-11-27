@@ -182,11 +182,7 @@ main:
 				break
 			}
 
-			// Construct a RistDataBlock for UDP
-			rb := &libristwrapper.RistDataBlock{
-				Data: pkt.Data,
-				// optionally set other fields if defined (like Timestamp, Source)
-			}
+			rb := libristwrapper.NewRistDataBlock(pkt.Data)
 
 			m.statusLock.Lock()
 			m.primaryInputStatus.packetcount++
