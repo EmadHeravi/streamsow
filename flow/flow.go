@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"code.videolan.org/rist/ristgo"
 	"github.com/odmedia/streamzeug/config"
 	"github.com/odmedia/streamzeug/input"
 	"github.com/odmedia/streamzeug/logging"
@@ -23,6 +24,7 @@ type Flow struct {
 	rcontext          context.Context
 	context           context.Context
 	cancel            context.CancelFunc
+	receiver          ristgo.Receiver
 	configuredOutputs map[string]outhandle
 	configLock        sync.Mutex
 	config            config.Flow
