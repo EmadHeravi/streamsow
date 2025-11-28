@@ -46,12 +46,12 @@ func InitReceiver(profile int) *Context {
 // SetLogLevel sets the global librist logging level (0–7)
 func (c *Context) SetLogLevel(level int) {
 	if c.ptr != nil {
-		// Modern librist unified logging interface
+		// Modern unified logging interface
 		C.rist_logging_set(nil, C.int(level))
 	}
 }
 
-// SetOutputIP adds a peer for output using the new librist 0.2.x API
+// SetOutputIP connects the sender to the given RIST/UDP URL
 func (c *Context) SetOutputIP(ip string) {
 	if c.ptr == nil {
 		return
@@ -60,18 +60,8 @@ func (c *Context) SetOutputIP(ip string) {
 	cip := C.CString(ip)
 	defer C.free(unsafe.Pointer(cip))
 
-	// Initialize default peer configuration
-	var peerConf C.struct_rist_peer_config
-	C.rist_peer_config_defaults_set(&peerConf)
-
-	// Parse the IP/port into the config
-	if C.rist_parse_address(cip, &peerConf) != 0 {
-		return
-	}
-
-	// Create and add the peer
-	var peer *C.struct_rist_peer
-	if C.rist_peer_create(&peer, c.ptr, &peerConf) == 0 {
-		C.rist_peer_insert(c.ptr, peer)
+	// New API: directly connect via URL string (rist:// or udp://)
+	if C.rist_url_connect(c.ptr, cip) != 0 {
+		// Connection failed – ignore or log as needed
 	}
 }
