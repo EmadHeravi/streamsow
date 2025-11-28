@@ -72,6 +72,6 @@ func (c *Context) SetOutputIP(ip string) {
 	// Create and add the peer
 	var peer *C.struct_rist_peer
 	if C.rist_peer_create(&peer, c.ptr, &peerConf) == 0 {
-		C.rist_peer_add(c.ptr, peer)
+		C.rist_peer_insert(c.ptr, peer)
 	}
 }
