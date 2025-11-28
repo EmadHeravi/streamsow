@@ -46,12 +46,11 @@ func InitReceiver(profile int) *Context {
 // SetLogLevel sets the global librist logging level (0–7)
 func (c *Context) SetLogLevel(level int) {
 	if c.ptr != nil {
-		// Modern unified logging interface
 		C.rist_logging_set(nil, C.int(level))
 	}
 }
 
-// SetOutputIP connects the sender to the given RIST/UDP URL
+// SetOutputIP configures the UDP output address using the legacy UDP config API
 func (c *Context) SetOutputIP(ip string) {
 	if c.ptr == nil {
 		return
@@ -60,8 +59,14 @@ func (c *Context) SetOutputIP(ip string) {
 	cip := C.CString(ip)
 	defer C.free(unsafe.Pointer(cip))
 
-	// New API: directly connect via URL string (rist:// or udp://)
-	if C.rist_url_connect(c.ptr, cip) != 0 {
-		// Connection failed – ignore or log as needed
+	var udpConf *C.struct_rist_udp_config
+
+	// Parse the address and build a UDP config structure
+	if C.rist_parse_udp_address2(cip, &udpConf) != 0 {
+		return
 	}
+	defer C.rist_udp_config_free2(&udpConf)
+
+	// Create the sender/receiver using this configuration
+	C.rist_sender_create(&c.ptr, C.int(0))
 }
