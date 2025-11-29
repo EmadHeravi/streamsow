@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V. All right reserved.
+ * SPDX-FileCopyrightText: Streamzeug Copyright © 2021 ODMedia B.V.
  * SPDX-FileContributor: Author: Gijs Peskens <gijs@peskens.net>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -12,22 +12,16 @@ import (
 	"time"
 
 	"code.videolan.org/rist/ristgo"
-	"github.com/EmadHeravi/streamsow/include_srt/libristwrapper"
 	"github.com/EmadHeravi/streamsow/logging"
 	"github.com/EmadHeravi/streamsow/output"
 	"github.com/rs/zerolog"
 )
 
-// InputPacket is a generic packet structure used for non-RIST
-// inputs such as plain UDP/RTP. It allows UDP readers to push
-// data into the mainloop without changing the existing RIST
-// receiver and output wiring.
-type InputPacket struct {
-	Data      []byte
-	Timestamp int64
-	Source    string
-}
+// InputPacket previously used for UDP/RTP input has been deprecated.
+// All input sources (UDP, SRT, RIST) are now normalized to RIST blocks
+// before entering this mainloop.
 
+// inputstatus tracks statistics for the primary input.
 type inputstatus struct {
 	packetcount        int
 	packetcountsince   int
@@ -36,6 +30,8 @@ type inputstatus struct {
 	lastPacketTime     time.Time
 }
 
+// Mainloop is the central receiver loop that takes RIST blocks
+// from a ristgo.ReceiverFlow and forwards them to registered outputs.
 type Mainloop struct {
 	ctx                context.Context
 	flow               ristgo.ReceiverFlow
@@ -44,20 +40,13 @@ type Mainloop struct {
 	outPutAdd          chan output.Output
 	outPutRemove       chan output.Output
 	outRemoveIdx       chan int
-	udpChan            chan InputPacket
 	wg                 sync.WaitGroup
 	statusLock         sync.Mutex
 	primaryInputStatus inputstatus
 	lastStatusCall     time.Time
 }
 
-// UDPChannel returns the internal UDP packet channel. UDP inputs
-// should send InputPacket instances to this channel from their
-// reader goroutines.
-func (m *Mainloop) UDPChannel() chan<- InputPacket {
-	return m.udpChan
-}
-
+// removeOutputByID schedules removal of an output by index.
 func (m *Mainloop) removeOutputByID(idx int) {
 	select {
 	case <-m.ctx.Done():
@@ -67,6 +56,7 @@ func (m *Mainloop) removeOutputByID(idx int) {
 	m.outRemoveIdx <- idx
 }
 
+// RemoveOutput schedules removal of an output by object.
 func (m *Mainloop) RemoveOutput(o output.Output) {
 	select {
 	case <-m.ctx.Done():
@@ -76,12 +66,14 @@ func (m *Mainloop) RemoveOutput(o output.Output) {
 	m.outPutRemove <- o
 }
 
+// deleteOutput closes the data channel and removes it from the map.
 func (m *Mainloop) deleteOutput(idx int, o output.Output) {
 	m.logger.Info().Msgf("deleting output: %s", o.String())
 	close(m.outputs[idx].dataChan)
 	delete(m.outputs, idx)
 }
 
+// AddOutput adds a new output writer to the mainloop.
 func (m *Mainloop) AddOutput(o output.Output) {
 	m.logger.Info().Msgf("adding output %s", o.String())
 	select {
@@ -92,6 +84,7 @@ func (m *Mainloop) AddOutput(o output.Output) {
 	m.outPutAdd <- o
 }
 
+// Wait blocks until the mainloop goroutines complete or timeout expires.
 func (m *Mainloop) Wait(timeout time.Duration) {
 	c := make(chan bool)
 	go func() {
@@ -107,7 +100,7 @@ func (m *Mainloop) Wait(timeout time.Duration) {
 }
 
 // NewMainloop wires a RIST ReceiverFlow into the main processing loop.
-// UDP/RTP inputs can additionally push packets into udpChan for stats.
+// All packet sources are normalized to RIST and appear in the same flow.
 func NewMainloop(ctx context.Context, flow ristgo.ReceiverFlow, identifier string) *Mainloop {
 	m := &Mainloop{
 		ctx:          ctx,
@@ -117,17 +110,17 @@ func NewMainloop(ctx context.Context, flow ristgo.ReceiverFlow, identifier strin
 		outPutAdd:    make(chan output.Output, 4),
 		outPutRemove: make(chan output.Output, 4),
 		outRemoveIdx: make(chan int, 16),
-		udpChan:      make(chan InputPacket, 512),
 	}
 	go receiveLoop(m)
 	return m
 }
 
+// receiveLoop consumes RIST data blocks from the flow and forwards to outputs.
 func receiveLoop(m *Mainloop) {
 	outputidx := 0
 	m.primaryInputStatus.lastPacketTime = time.Now()
 	m.lastStatusCall = m.primaryInputStatus.lastPacketTime
-	expectedSec := uint16(0)
+	expectedSeq := uint16(0)
 	m.logger.Info().Msg("receiver mainloop started")
 	m.wg.Add(1)
 	lastDiscontinuityMsg := time.Time{}
@@ -139,16 +132,17 @@ main:
 		case <-m.ctx.Done():
 			break main
 
-		// RIST receiver path (existing behaviour)
+		// Unified RIST input path
 		case rb, ok := <-m.flow.DataChannel():
 			if !ok {
 				break main
 			}
+
 			discontinuity := false
 			if rb.Discontinuity {
 				discontinuity = true
 			}
-			if rb.SeqNo != uint32(expectedSec) {
+			if rb.SeqNo != uint32(expectedSeq) {
 				discontinuity = true
 			}
 			if discontinuity {
@@ -165,7 +159,7 @@ main:
 				discontinuitiesSinceLastMsg = 0
 			}
 
-			expectedSec = uint16(rb.SeqNo) + 1
+			expectedSeq = uint16(rb.SeqNo) + 1
 
 			m.statusLock.Lock()
 			m.primaryInputStatus.packetcount++
@@ -174,24 +168,6 @@ main:
 			m.primaryInputStatus.bytesSince += len(rb.Data)
 			m.statusLock.Unlock()
 
-			m.writeOutputs(rb)
-
-		// UDP/RTP packet path (stats only, no output write)
-		case pkt := <-m.udpChan:
-			if pkt.Data == nil {
-				break
-			}
-
-			rb := libristwrapper.NewRistDataBlock(pkt.Data)
-
-			m.statusLock.Lock()
-			m.primaryInputStatus.packetcount++
-			m.primaryInputStatus.packetcountsince++
-			m.primaryInputStatus.lastPacketTime = time.Now()
-			m.primaryInputStatus.bytesSince += len(pkt.Data)
-			m.statusLock.Unlock()
-
-			rb := NewUDPBlock(pkt.Data)
 			m.writeOutputs(rb)
 
 		case o := <-m.outPutAdd:
@@ -232,7 +208,6 @@ main:
 	close(m.outPutAdd)
 	close(m.outPutRemove)
 	close(m.outRemoveIdx)
-	close(m.udpChan)
 	m.logger.Info().Msg("mainloop terminated")
 	m.wg.Done()
 }

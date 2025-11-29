@@ -9,12 +9,14 @@ import (
 	"net"
 	"time"
 
+	"github.com/EmadHeravi/streamsow/include_srt/libristwrapper"
+	"github.com/EmadHeravi/streamsow/input/normalizer"
 	"github.com/EmadHeravi/streamsow/logging"
-	"github.com/EmadHeravi/streamsow/mainloop"
 )
 
-// StartReader starts the UDP socket listener and forwards packets into flow channel.
-func (i *UdpInput) StartReader(ch chan<- mainloop.InputPacket) error {
+// StartReader starts the UDP socket listener and forwards
+// packets into the unified RIST flow using a local RIST sender.
+func (i *UdpInput) StartReader() error {
 	logger := logging.Log.With().
 		Str("module", "udp-reader").
 		Str("identifier", i.identifier).
@@ -36,6 +38,14 @@ func (i *UdpInput) StartReader(ch chan<- mainloop.InputPacket) error {
 
 	logger.Info().Msgf("UDP listening on %s", i.url.Host)
 
+	// ----------- Initialize RIST Sender ------------
+	sender := libristwrapper.InitSender(0) // profile 0 = simple main profile
+	defer sender.Free()
+
+	// Optionally configure the local receiver address if needed
+	// (e.g., "udp://127.0.0.1:9000" where your RIST receiver flow listens)
+	sender.SetOutputIP("udp://127.0.0.1:9000")
+
 	// ----------- Reader Loop -----------------
 	go func() {
 		defer conn.Close()
@@ -50,7 +60,7 @@ func (i *UdpInput) StartReader(ch chan<- mainloop.InputPacket) error {
 			default:
 				// Non-blocking read with timeout
 				conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-				n, addr, err := conn.ReadFromUDP(buf)
+				n, _, err := conn.ReadFromUDP(buf)
 				if err != nil {
 					if ne, ok := err.(net.Error); ok && ne.Timeout() {
 						continue // timeout → retry
@@ -59,17 +69,18 @@ func (i *UdpInput) StartReader(ch chan<- mainloop.InputPacket) error {
 					continue
 				}
 
-				// Forward packet into mainloop
-				pkt := mainloop.InputPacket{
-					Data:      append([]byte(nil), buf[:n]...), // copy
-					Timestamp: time.Now().UnixNano(),
-					Source:    addr.String(),
+				// Wrap UDP data into a RIST-compatible block
+				rb := normalizer.WrapToRist(buf[:n])
+				if rb == nil {
+					continue
 				}
 
-				select {
-				case ch <- pkt:
-				default:
-					logger.Warn().Msg("mainloop channel full — dropping packet")
+				// Send to RIST flow (loopback or configured peer)
+				ret := sender.SendData(rb)
+				rb.Return()
+
+				if ret != 0 {
+					logger.Warn().Msg("RIST send returned non-zero (dropped or error)")
 				}
 			}
 		}
